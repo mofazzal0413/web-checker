@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Checker</title>
+    <style>
+        /* Spinner animation */
+.loader {
+    border: 6px solid #f3f3f3;
+    border-top: 6px solid #3498db;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* PASS/FAIL badges */
+.badge-pass {
+    background-color: #4CAF50;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+}
+
+.badge-fail {
+    background-color: #E53935;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+}
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+
+        .badge-pass {
+            background-color: #4CAF50;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .badge-fail {
+            background-color: #E53935;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        textarea {
+            width: 400px;
+            height: 120px;
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        ul {
+            margin-top: 20px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Web Checker – Multiple URL Test</h1>
+
+    <form method="POST" onsubmit="showSpinner()">
+        <textarea name="urls" placeholder="Enter one URL per line"></textarea>
+        <br>
+        <button type="submit">Check URLs</button>
+    </form>
+
+    <!-- Loading Spinner -->
+    <div id="spinner" style="display:none; margin-top:20px;">
+        <div class="loader"></div>
+        <p>Checking URLs...</p>
+    </div>
+
+    {% if results %}
+        <h2>Results</h2>
+        <ul>
+            {% for url, result in results %}
+                <li>
+                    <strong>{{ url }}</strong> →
+                    {% if "PASS" in result %}
+                        <span class="badge-pass">PASS</span>
+                    {% else %}
+                        <span class="badge-fail">FAIL</span>
+                    {% endif %}
+                    &nbsp; {{ result.split(":")[1] }}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <script>
+        function showSpinner() {
+            document.getElementById("spinner").style.display = "block";
+        }
+    </script>
+</body>
