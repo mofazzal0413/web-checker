@@ -1,13 +1,16 @@
-from selenium_test import run_selenium_smoke_test
 import os
+RUNNING_ON_RENDER = os.environ.get("RENDER") == "true"
+
 from flask import Flask, render_template, request, Response
 import requests
 import time
 import csv
 from io import StringIO
 
-# Detect Render environment
-RUNNING_ON_RENDER = os.environ.get("RENDER") == "true"
+# Only import Selenium locally
+if not RUNNING_ON_RENDER:
+    from selenium_test import run_selenium_smoke_test
+
 
 app = Flask(__name__)
 
