@@ -1,119 +1,123 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Web Checker</title>
-    <style>
-        /* Spinner animation */
-.loader {
-    border: 6px solid #f3f3f3;
-    border-top: 6px solid #3498db;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-    margin: auto;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* PASS/FAIL badges */
-.badge-pass {
-    background-color: #4CAF50;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-weight: bold;
-}
-
-.badge-fail {
-    background-color: #E53935;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-weight: bold;
-}
-
-        body {
-            font-family: Arial, sans-serif;
-            margin: 40px;
-        }
-
-        .badge-pass {
-            background-color: #4CAF50;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-weight: bold;
-        }
-
-        .badge-fail {
-            background-color: #E53935;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-weight: bold;
-        }
-
-        textarea {
-            width: 400px;
-            height: 120px;
-            padding: 10px;
-            font-size: 14px;
-        }
-
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            margin-top: 10px;
-        }
-
-        ul {
-            margin-top: 20px;
-        }
-
-        li {
-            margin-bottom: 10px;
-        }
-    </style>
+    <title>Deployment Health Checker</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
-<body>
-    <h1>Web Checker – Multiple URL Test</h1>
+
+<body class="page-fade">
+
+<!-- Dark Mode Button -->
+<button class="dark-toggle-btn" onclick="toggleDarkMode()">Dark Mode</button>
+
+<!-- Loading Bar -->
+<div id="loadingBar" class="loading-bar"></div>
+
+<div class="app-card">
+
+    <h1 class="text-center mb-3">Deployment Health Checker</h1>
+    <p class="text-center text-muted">Enter one URL per line to check deployment health.</p>
 
     <form method="POST" onsubmit="showSpinner()">
-        <textarea name="urls" placeholder="Enter one URL per line"></textarea>
-        <br>
-        <button type="submit">Check URLs</button>
+        <textarea name="urls" class="form-control" rows="5" placeholder="https://example.com&#10;https://another-site.com"></textarea>
+        <button type="submit" class="btn btn-primary mt-3 w-100">Run Check</button>
     </form>
 
-    <!-- Loading Spinner -->
-    <div id="spinner" style="display:none; margin-top:20px;">
+    <!-- Spinner -->
+    <div id="spinner" style="display:none;" class="text-center mt-4">
         <div class="loader"></div>
         <p>Checking URLs...</p>
     </div>
 
+    <!-- Results -->
     {% if results %}
-        <h2>Results</h2>
-        <ul>
-            {% for url, result in results %}
-                <li>
-                    <strong>{{ url }}</strong> →
-                    {% if "PASS" in result %}
-                        <span class="badge-pass">PASS</span>
-                    {% else %}
-                        <span class="badge-fail">FAIL</span>
-                    {% endif %}
-                    &nbsp; {{ result.split(":")[1] }}
-                </li>
+    <div class="results-wrapper">
+        <ul class="list-group mt-3 fade-in">
+            {% for r in results %}
+            <li class="list-group-item slide-up">
+                <strong>{{ r.url }}</strong> →
+                {% if r.status == "PASS" %}
+                    <span class="icon-pass">✔</span>
+                    <span class="badge-pass">PASS</span>
+                {% else %}
+                    <span class="icon-fail">✘</span>
+                    <span class="badge-fail">FAIL</span>
+                {% endif %}
+                &nbsp; {{ r.message }}
+            </li>
             {% endfor %}
         </ul>
+
+        <!-- CSV Download Button -->
+        <button onclick="window.location.href='/export_csv'" class="btn btn-success mt-3 w-100">
+            Download CSV
+        </button>
+    </div>
     {% endif %}
 
-    <script>
-        function showSpinner() {
-            document.getElementById("spinner").style.display = "block";
-        }
-    </script>
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <footer class="footer-name text-center">
+        Built by <span class="my-name">Mofazzal Hossain</span>
+    </footer>
+
+</div>
+
+<!-- Audio -->
+<audio id="successSound" src="{{ url_for('static', filename='sounds/success.mp3') }}"></audio>
+<audio id="failSound" src="{{ url_for('static', filename='sounds/fail.mp3') }}"></audio>
+
+<!-- Scripts -->
+<script>
+function toggleDarkMode() {
+    document.body.classList.toggle("dark-mode");
+}
+
+function showSpinner() {
+    document.getElementById("spinner").style.display = "block";
+
+    const bar = document.getElementById("loadingBar");
+    bar.style.width = "70%";
+
+    setTimeout(() => {
+        bar.style.width = "100%";
+    }, 500);
+}
+
+function playSounds(results) {
+    let hasFail = results.some(r => r.status === "FAIL");
+    let hasPass = results.some(r => r.status === "PASS");
+
+    if (hasFail) {
+        document.getElementById("failSound").play();
+    } else if (hasPass) {
+        document.getElementById("successSound").play();
+    }
+}
+
+function showToast(message, type) {
+    const toast = document.getElementById("toast");
+    toast.className = "toast toast-" + type + " show";
+    toast.innerText = message;
+
+    setTimeout(() => {
+        toast.classList.remove("show");
+    }, 3000);
+}
+
+const resultsData = {{ results|tojson }};
+if (resultsData.length > 0) {
+    playSounds(resultsData);
+
+    if (resultsData.some(r => r.status === "FAIL")) {
+        showToast("Some URLs failed the check", "fail");
+    } else {
+        showToast("All URLs passed successfully!", "success");
+    }
+}
+</script>
+
 </body>
+</html>

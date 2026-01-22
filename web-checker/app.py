@@ -1,47 +1,108 @@
-from flask import Flask, render_template, request
+from selenium_test import run_selenium_smoke_test
+
+from flask import Flask, render_template, request, Response
 import requests
 import time
+import csv
+from io import StringIO
 
 app = Flask(__name__)
 
+# ---------------- CSV EXPORT ROUTE ----------------
+@app.route("/export_csv")
+def export_csv():
+    results = app.config.get("LAST_RESULTS", [])
+
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(["URL", "Status", "Message"])
+
+    for r in results:
+        writer.writerow([r["url"], r["status"], r["message"]])
+
+    output = si.getvalue()
+    si.close()
+
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=results.csv"}
+    )
+
+
+# ---------------- URL CHECK FUNCTION ----------------
 def check_single_url(url):
+    url = url.strip()
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    result = {"url": url}
+
     try:
         start = time.time()
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=5, allow_redirects=True)
         end = time.time()
 
-        response_time = int((end - start) * 1000)  # convert to ms
+        result["response_time"] = int((end - start) * 1000)
+        result["status_code"] = response.status_code
 
         if response.status_code == 200:
-            return "PASS", f"200 OK — {response_time}ms"
+            result["status"] = "PASS"
+            result["message"] = f"200 OK — {result['response_time']}ms"
         else:
-            return "FAIL", f"Status {response.status_code} — {response_time}ms"
+            result["status"] = "FAIL"
+            result["message"] = f"Status {response.status_code} — {result['response_time']}ms"
+
+    except requests.exceptions.ConnectionError:
+        result["status"] = "FAIL"
+        result["message"] = "Connection failed"
+
+    except requests.exceptions.Timeout:
+        result["status"] = "FAIL"
+        result["message"] = "Request timed out"
+
+    except requests.exceptions.InvalidURL:
+        result["status"] = "FAIL"
+        result["message"] = "Invalid URL"
+
+    except requests.exceptions.InvalidSchema:
+        result["status"] = "FAIL"
+        result["message"] = "Invalid URL format"
 
     except Exception as e:
-        return "FAIL", f"{str(e)}"
+        result["status"] = "FAIL"
+        result["message"] = f"Error: {str(e)}"
+
+    return result
 
 
+# ---------------- MAIN ROUTE ----------------
 @app.route("/", methods=["GET", "POST"])
 def home():
     results = []
 
     if request.method == "POST":
-        urls_text = request.form.get("urls")
+        urls_text = request.form.get("urls", "").strip()
 
         if not urls_text:
-            results.append(("No URL provided", "FAIL"))
-            return render_template("index.html", results=results)
+            results.append({"url": "None", "status": "FAIL", "message": "No URL provided"})
+        else:
+            urls = urls_text.split("\n")
+            for url in urls:
+                if url.strip():
+                    # Normal HTTP check
+                    results.append(check_single_url(url))
 
-        # Split URLs by new line
-        urls = urls_text.strip().split("\n")
+                    # Selenium smoke test
+                    selenium_result = run_selenium_smoke_test(url)
+                    results.append(selenium_result)
 
-        for url in urls:
-            url = url.strip()
-            if url:
-                status, message = check_single_url(url)
-                results.append((url, f"{status}: {message}"))
+        # Save results for CSV export
+        app.config["LAST_RESULTS"] = results
 
     return render_template("index.html", results=results)
 
+
+# ---------------- RUN APP ----------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=5001)
